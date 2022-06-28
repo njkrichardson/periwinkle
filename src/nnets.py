@@ -7,26 +7,30 @@ from torch import nn
 from type_aliases import * 
 
 @dataclasses.dataclass
-class EmbeddingConfig: 
-    """Configuration dataclass for the time-series 
-    embedding network. Contains attributes to encapsulate 
-    the architectural parameters of the network. 
+class ForecastingConfig: 
+    """Configuration dataclass for the end-to-end
+    forecasting network.
     """
-    sequence_length: Optional[int] = 64 
+    sequence_length: Optional[int] = 16
+    asset_dimension: Optional[int] = 32
+    num_assets: Optional[int] = 8
+
+    # --- time series embedding 
+    embedding_input_dimension: Optional[int] = 128
+
+    # --- transformer 
     model_dimension: Optional[int] = 64 
     num_heads: Optional[int] = 4
     hidden_dimension: Optional[int] = 16 
     num_layers: Optional[int] = 4 
+
+    # --- aggregation net
+    mlp_input_dimension: Optional[int] = 1024
+    output_dimension: Optional[int] = 8 
+    nonlinearity: Optional[str] = "relu" 
+
+    # --- auxiliary parameters 
     dropout_rate: Optional[float] = 0.
-
-@dataclasses.dataclass
-class ForecastingConfig: 
-    """Configuration dataclass for the end-to-end
-    forecasting network.
-
-    TODO add an aggegation config for the feedforward net
-    """
-    embedding_config: Optional[EmbeddingConfig] = dataclasses.field(default_factory=EmbeddingConfig)
 
 class FeedForwardNet(nn.Module): 
     """Vanilla fully-connected multi-layer 
@@ -34,18 +38,17 @@ class FeedForwardNet(nn.Module):
 
     TODO: make layer sizes parametric 
     """
-    def __init__(self, activation: str="relu"): 
+    def __init__(self, config: ForecastingConfig): 
         super(FeedForwardNet, self).__init__()
-        nonlinearity: layer = nn.ReLU() if activation == "relu" else NotImplementedError
-        self.ravel: layer = nn.Flatten()
+        nonlinearity: layer = nn.ReLU() if config.nonlinearity == "relu" else NotImplementedError
         self.net: layer = nn.Sequential(
-                nn.Linear(80, 128), nonlinearity, 
-                nn.Linear(128, 64)
+                nn.Linear(config.mlp_input_dimension, 128), nonlinearity, 
+                nn.Linear(128, config.output_dimension)
                 )
+        self.config = config
 
     def forward(self, x: tensor) -> tensor: 
-        x: tensor = self.ravel(tensor) 
-        out: tensor = self.net(x) 
+        out: tensor = self.net(x.view(-1, self.config.sequence_length * self.config.model_dimension)) 
         return out 
 
 class PositionalEncoding(nn.Module): 
@@ -72,9 +75,9 @@ class EmbeddingNet(nn.Module):
     with sequence data. The architecture is a 
     transformer encoder. 
     """
-    def __init__(self, config: EmbeddingConfig): 
+    def __init__(self, config: ForecastingConfig): 
         super(EmbeddingNet, self).__init__() 
-        self.encoder: layer = nn.Linear(config.sequence_length, config.model_dimension)
+        self.encoder: layer = nn.Linear(config.embedding_input_dimension, config.model_dimension)
         self.positional_encoder: layer = PositionalEncoding(config.model_dimension, config.dropout_rate)
         self.transformer_encoder: layer = nn.TransformerEncoder(
                 nn.TransformerEncoderLayer(config.model_dimension, config.num_heads, config.hidden_dimension, config.dropout_rate), 
@@ -89,7 +92,8 @@ class EmbeddingNet(nn.Module):
         self.encoder.weight.data.uniform_(-initialization_range, initialization_range)
 
     def forward(self, x: tensor) -> tensor: 
-        x = self.positional_encoder(self.encoder(x) * math.sqrt(self.config.model_dimension))
+        x: tensor = x.view(-1, self.config.sequence_length, self.config.num_assets * self.config.asset_dimension)
+        x: tensor = self.positional_encoder(self.encoder(x) * math.sqrt(self.config.model_dimension))
         out: tensor = self.transformer_encoder(x) 
         return out 
 
@@ -100,11 +104,12 @@ class ForecastingNet(nn.Module):
     """
     def __init__(self, config: ForecastingConfig): 
         super(ForecastingNet, self).__init__() 
-        self.time_series_encoder: layer = EmbeddingNet(config.embedding_config)
-        self.aggregation_net: layer = FeedForwardNet() 
+        self.model_type: str = "ForecastingNet"
+        config.embedding_input_dimension = config.num_assets * config.asset_dimension
+        self.time_series_encoder: layer = EmbeddingNet(config)
+        self.aggregation_net: layer = FeedForwardNet(config)
 
-    def forward(self, inputs: tuple) -> tensor: 
-        time_series, auxiliary = inputs 
+    def forward(self, time_series: tensor) -> tensor: 
         time_series_encoding: tensor = self.time_series_encoder(time_series)
-        out: tensor = self.aggregation_net(torch.cat(time_series_encoding, auxiliary))
+        out: tensor = self.aggregation_net(time_series_encoding)
         return out 
