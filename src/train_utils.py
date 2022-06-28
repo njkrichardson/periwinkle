@@ -2,10 +2,11 @@ import dataclasses
 
 import torch 
 
-from logging_utils import setup_log 
+from logging_utils import setup_logger
+from typing import * 
 
 def configure_device(use_gpu: bool=False) -> str: 
-    log = setup_log(__name__) 
+    log = setup_logger(__name__) 
     
     if torch.cuda.is_available(): 
         return "cuda" 
