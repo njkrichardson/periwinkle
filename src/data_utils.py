@@ -25,21 +25,28 @@ class CustomDataset(Dataset):
     targets.
     """
     def __init__(self, data_path: path_t=None): 
-        self.data_path = os.path.join(get_data_directory(), "data.pkl") if archive_location is None else archive_location
+        self.data_path = os.path.join(get_data_directory(), "data.pkl") if data_path is None else data_path
         self.data: dict = load_object(self.data_path)
 
     def __len__(self) -> int: 
-        return self.data["inputs"]["time_series"].shape[0]
+        return self.data["inputs"].shape[0]
 
     def __getitem__(self, idx: int) -> Tuple[tensor, tensor, tensor]: 
-        _time_series, _auxiliary = self.data["inputs"]["time_series"][idx], self.data["inputs"]["auxiliary"][idx]
-        _target: ndarray = self.data["targets"][idx] 
-        return torch.from_numpy(_time_series), torch.from_numpy(_auxiliary), torch.from_numpy(_target)
+        time_series: tensor = self.data["inputs"][idx]
+        target: tensor = self.data["targets"][idx] 
 
-def create_dataloader(dataset: Dataset, archive_location: path_t=None, shuffle: bool=True, batch_size: int=64, num_workers: int=0) -> DataLoader: 
+        if type(time_series) == ndarray: 
+            return torch.from_numpy(time_series), torch.from_numpy(target)
+        elif type(time_series) == tensor: 
+            return time_series,  target
+        else: 
+            raise NotImplementedError
+
+def create_dataloader(dataset: Dataset, shuffle: bool=True, batch_size: int=64, num_workers: int=0) -> DataLoader: 
     return DataLoader(dataset, batch_size=batch_size, shuffle=shuffle, num_workers=num_workers)
 
 def get_default_config() -> DataConfig: 
+    data_path: path_t = os.path.join(get_data_directory(), "data.pkl")
     dataset: CustomDataset = CustomDataset()
     dataloader: DataLoader = create_dataloader(dataset) 
     config: DataConfig = DataConfig(
@@ -49,8 +56,7 @@ def get_default_config() -> DataConfig:
             )
     return config 
 
-def simulate_data(num_timesteps: int=10_000, time_series_dim: int=64, auxiliary_dim: int=16, save: bool=False) -> dict: 
-    import pdb; pdb.set_trace()
+def simulate_data(num_examples: int=8_192, sequence_length: int=16, num_assets: int=8, asset_dim: int=32, save: bool=False) -> dict: 
     log = setup_logger(__name__) 
     save_path: path_t = os.path.join(get_data_directory(), "data.pkl")
 
@@ -61,17 +67,15 @@ def simulate_data(num_timesteps: int=10_000, time_series_dim: int=64, auxiliary_
     log.info(f"did not find existing dataset at: {save_path}")
     log.info("generating...")
 
-    time_series: tensor = torch.randn(num_timesteps, time_series_dim)
-    auxiliary: tensor = torch.randn(num_timesteps, auxiliary_dim)
-    targets: tensor = torch.randn(num_timesteps, time_series_dim)
+    time_series: tensor = torch.randn(num_examples, sequence_length, num_assets, asset_dim)
+    targets: tensor = torch.randn(num_examples, num_assets)
     dataset: dict = dict(
-            time_series=time_series, 
-            auxiliary=auxiliary, 
+            inputs=time_series, 
             targets=targets
             )
 
     if save: 
         save_object(dataset, save_path) 
         log.info(f"saved dataset to: {save_path}")
-    else: 
-        return get_default_config()
+
+    return get_default_config()
