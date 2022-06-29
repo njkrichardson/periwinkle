@@ -60,19 +60,15 @@ the dataset will be simulated and cached to disk; subsequent invocations will si
 ```python
 # --- instantiate the network 
 net: network_t = ForecastingNet(ForecastingConfig()).to(device) 
-args.log.info(f"instantiated network of type: {net.model_type}")
 
 # --- load the dataset 
-args.log.info("started loading the dataset")
 dataset: DataConfig = simulate_data(save=True)
-args.log.info("finished loading the dataset")
 ```
 To use automatic differentiation to compute derivatives of our cost (here, mean-squared error) with respect to the parameters, we need to instantiate an [optimizer object](https://pytorch.org/docs/stable/optim.html#torch.optim.Optimizer)
 and with an iterable containing any parameters. 
 
 ```python
 # --- configure the optimization parameters 
-args.log.info("configuring optimizer")
 criterion = nn.MSELoss()
 learning_rate: float = 1e-2
 optimizer = torch.optim.Adam(net.parameters(), lr=learning_rate)
