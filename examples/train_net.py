@@ -35,7 +35,7 @@ def main(args: namespace):
     net: network_t = ForecastingNet(ForecastingConfig()).to(device) 
     args.log.info(f"instantiated network of type: {net.model_type}")
 
-    # --- laod the dataset 
+    # --- load the dataset 
     args.log.info("started loading the dataset")
     dataset: DataConfig = simulate_data(save=True)
     args.log.info("finished loading the dataset")
