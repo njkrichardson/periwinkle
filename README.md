@@ -6,10 +6,10 @@ Periwinkle is a research package for applying deep learning methods to financial
 models for learning and inference implemented in [PyTorch](https://pytorch.org/), and fire-and-forget examples to get started. 
 
 ## Contents 
-  1. [Installing Dependencies]()
-  2. [Getting Started]() 
-  3. [Forecasting Model]() 
-  4. [References]() 
+  1. [Installing Dependencies](https://github.com/njkrichardson/periwinkle#installing-dependencies)
+  2. [Getting Started](https://github.com/njkrichardson/periwinkle#getting-started) 
+  3. [Forecasting Model](https://github.com/njkrichardson/periwinkle#forecasting-model) 
+  4. [References](https://github.com/njkrichardson/periwinkle#references) 
 
 ---
 ## Installing Dependencies 
